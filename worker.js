@@ -88,14 +88,16 @@ export default {
         if (status === "approved" && body.paymentReceived !== true) {
           return cors(json({ error: "Confirme o pagamento antes de aprovar." }, 400), origin, allowed);
         }
-        const days = status === "approved" && body.plan === "premium" ? 30 : status === "approved" && body.plan === "featured" ? 7 : null;
+        const plan = ["standard", "featured", "premium"].includes(body.plan) ? body.plan : "standard";
+        const days = status === "approved" && plan === "premium" ? 30 : status === "approved" && plan === "featured" ? 7 : null;
+        const featured = status === "approved" && plan === "featured" ? 1 : 0;
         const expirySql = days ? "datetime('now', ?)" : "NULL";
         const expiryArg = days ? "+" + days + " days" : null;
         if (days) {
-          await env.DB.prepare("UPDATE profiles SET status = ?, payment_received = ?, expires_at = " + expirySql + ", updated_at = datetime('now') WHERE id = ?")
-            .bind(status, paymentReceived ?? 0, expiryArg, match[1]).run();
+          await env.DB.prepare("UPDATE profiles SET status = ?, payment_received = ?, is_featured = ?, expires_at = " + expirySql + ", updated_at = datetime('now') WHERE id = ?")
+            .bind(status, paymentReceived ?? 0, featured, expiryArg, match[1]).run();
         } else {
-          await env.DB.prepare("UPDATE profiles SET status = ?, payment_received = COALESCE(?, payment_received), updated_at = datetime('now') WHERE id = ?")
+          await env.DB.prepare("UPDATE profiles SET status = ?, payment_received = COALESCE(?, payment_received), is_featured = 0, updated_at = datetime('now') WHERE id = ?")
             .bind(status, paymentReceived, match[1]).run();
         }
         return cors(json({ ok: true, id: match[1], status }), origin, allowed);
